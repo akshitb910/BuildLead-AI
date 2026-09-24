@@ -1,0 +1,299 @@
+// use prisma-next
+
+model User {
+  id         Int        @id @default(autoincrement())
+  name       String?
+  email      String     @unique
+  createdAt  DateTime   @default(now())
+  businesses Business[]
+  notifications Notification[]
+  aiGenerations AIGeneration[]
+  agentRuns AgentRun[]
+  auditLogs AuditLog[]
+}
+
+model Business {
+  id            Int          @id @default(autoincrement())
+  userId        Int
+  name          String
+  website       String?
+  description   String?
+  location      String
+  industry      String
+  createdAt     DateTime     @default(now())
+
+  user          User         @relation(fields: [userId], references: [id])
+  products      Product[]
+  targetRule    TargetRule?
+  opportunities Opportunity[]
+  emailAccounts EmailAccount[]
+  campaigns     Campaign[]
+  agentRuns AgentRun[]
+  auditLogs AuditLog[]
+}
+
+model Product {
+  id           Int      @id @default(autoincrement())
+  businessId   Int
+  name         String
+  category     String?
+  description  String?
+  applications String[]
+  createdAt    DateTime @default(now())
+
+  business Business @relation(fields: [businessId], references: [id])
+}
+
+model TargetRule {
+  id           Int      @id @default(autoincrement())
+  businessId   Int      @unique
+  locations    String[]
+  companyTypes String[]
+  projectTypes String[]
+  targetRoles  String[]
+  keywords     String[]
+  createdAt    DateTime @default(now())
+
+  business Business @relation(fields: [businessId], references: [id])
+}
+
+model Project {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String?
+  location    String?
+  address     String?
+  projectType String?
+  stage       String?
+  website     String?
+  firstSeenAt DateTime @default(now())
+  lastSeenAt  DateTime @default(now())
+  createdAt   DateTime @default(now())
+
+  sources       ProjectSource[]
+  opportunities Opportunity[]
+}
+
+model ProjectSource {
+  id          Int      @id @default(autoincrement())
+  projectId   Int
+  url         String
+  title       String?
+  sourceType  String
+  publishedAt DateTime?
+  retrievedAt DateTime @default(now())
+  excerpt     String?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id])
+}
+
+model Organization {
+  id          Int      @id @default(autoincrement())
+  name        String
+  legalName   String?
+  website     String?
+  industry    String?
+  location    String?
+  description String?
+  createdAt   DateTime @default(now())
+
+  opportunities Opportunity[]
+  contacts      Contact[]
+}
+
+model Contact {
+  id             Int      @id @default(autoincrement())
+  organizationId Int
+  firstName      String?
+  lastName       String?
+  fullName       String
+  role           String?
+  email          String?
+  phone          String?
+  linkedinUrl    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @default(now())
+
+  organization Organization  @relation(fields: [organizationId], references: [id])
+  sources      ContactSource[]
+  opportunities Opportunity[]
+}
+
+model ContactSource {
+  id          Int      @id @default(autoincrement())
+  contactId   Int
+  url         String
+  sourceType  String
+  retrievedAt DateTime @default(now())
+  excerpt     String?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  contact Contact @relation(fields: [contactId], references: [id])
+}
+
+model Opportunity {
+  id                  Int      @id @default(autoincrement())
+  businessId          Int
+  projectId           Int
+  organizationId      Int?
+  contactId           Int?
+  status              String   @default("DISCOVERED")
+  relevanceScore      Int?
+  qualificationReason String?
+  discoveredAt        DateTime @default(now())
+  createdAt           DateTime @default(now())
+
+  business     Business      @relation(fields: [businessId], references: [id])
+  project      Project       @relation(fields: [projectId], references: [id])
+  organization Organization? @relation(fields: [organizationId], references: [id])
+  contact      Contact?      @relation(fields: [contactId], references: [id])
+  campaignLeads CampaignLead[]
+  aiGenerations AIGeneration[]
+}
+
+model EmailAccount {
+  id           Int      @id @default(autoincrement())
+  businessId   Int
+  email        String
+  provider     String
+  providerId   String?
+  accessToken  String?
+  refreshToken String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @default(now())
+
+  business Business @relation(fields: [businessId], references: [id])
+  emails   Email[] @relation("EmailAccountEmails")
+  campaigns Campaign[]
+}
+
+model Campaign {
+  id             Int      @id @default(autoincrement())
+  businessId     Int
+  emailAccountId Int?
+  name           String
+  status         String   @default("DRAFT")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @default(now())
+
+  business     Business      @relation(fields: [businessId], references: [id])
+  emailAccount EmailAccount? @relation(fields: [emailAccountId], references: [id])
+  leads        CampaignLead[]
+  emails       Email[]
+}
+
+model CampaignLead {
+  id            Int      @id @default(autoincrement())
+  campaignId    Int
+  opportunityId Int
+  status        String   @default("PENDING")
+  addedAt       DateTime @default(now())
+
+  campaign    Campaign    @relation(fields: [campaignId], references: [id])
+  opportunity Opportunity @relation(fields: [opportunityId], references: [id])
+  emails      Email[]
+
+  @@unique([campaignId, opportunityId])
+}
+
+model Email {
+  id             Int      @id @default(autoincrement())
+  emailAccountId Int
+  campaignId     Int?
+  campaignLeadId Int?
+  messageId      String?
+  threadId       String?
+  toEmail        String
+  subject        String
+  body           String
+  direction      String
+  status         String   @default("DRAFT")
+  sentAt         DateTime?
+  createdAt      DateTime @default(now())
+
+  emailAccount EmailAccount @relation("EmailAccountEmails", fields: [emailAccountId], references: [id])
+  campaign     Campaign?    @relation(fields: [campaignId], references: [id])
+  campaignLead CampaignLead? @relation(fields: [campaignLeadId], references: [id])
+  events       EmailEvent[]
+  replies      EmailReply[]
+}
+
+model EmailEvent {
+  id        Int      @id @default(autoincrement())
+  emailId   Int
+  eventType String
+  eventAt   DateTime @default(now())
+  metadata  Json?
+
+  email Email @relation(fields: [emailId], references: [id])
+}
+
+model EmailReply {
+  id          Int      @id @default(autoincrement())
+  emailId     Int
+  fromEmail   String
+  subject     String?
+  body        String
+  receivedAt  DateTime @default(now())
+  classification String?
+  confidence    Int?
+
+  email Email @relation(fields: [emailId], references: [id])
+}
+
+model AIGeneration {
+  id           Int      @id @default(autoincrement())
+  userId       Int?
+  opportunityId Int?
+  type         String
+  model        String
+  prompt       String
+  output       String
+  inputTokens  Int?
+  outputTokens Int?
+  createdAt    DateTime @default(now())
+
+  opportunity Opportunity? @relation(fields: [opportunityId], references: [id])
+}
+
+model AgentRun {
+  id           Int      @id @default(autoincrement())
+  userId       Int?
+  businessId   Int?
+  type         String
+  status       String   @default("RUNNING")
+  startedAt    DateTime @default(now())
+  completedAt  DateTime?
+  error        String?
+  metadata     Json?
+
+  business Business? @relation(fields: [businessId], references: [id])
+}
+
+model Notification {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  type      String
+  title     String
+  message   String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+model AuditLog {
+  id         Int      @id @default(autoincrement())
+  userId     Int?
+  businessId Int?
+  action     String
+  entityType String
+  entityId   Int?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  business Business? @relation(fields: [businessId], references: [id])
+}
